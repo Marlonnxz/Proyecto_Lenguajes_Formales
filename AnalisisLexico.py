@@ -26,7 +26,7 @@ IGNORAR = {"el", "los", "las", "un", "una", "campo", "campos"}
 # 2. FUNCIONES AUXILIARES PARA LEER EL TEXTO
 # =============================================================================
 
-def _leer_palabra(texto, i):
+def leer_palabra(texto, i):
     """Lee letras consecutivas desde la posición i hasta encontrar un espacio o símbolo."""
     inicio = i
     n = len(texto)
@@ -35,7 +35,7 @@ def _leer_palabra(texto, i):
     return texto[inicio:i], i
 
 
-def _saltar_espacios(texto, i):
+def saltar_espacios(texto, i):
     """Avanza el índice i mientras encuentre espacios en blanco."""
     n = len(texto)
     while i < n and texto[i].isspace():
@@ -43,7 +43,7 @@ def _saltar_espacios(texto, i):
     return i
 
 
-def _match_frase_from(texto, i, primera_palabra):
+def match_frase_from(texto, i, primera_palabra):
     """
     Verifica si las siguientes palabras forman una frase tipo 'de la tabla'.
     Si coincide, devuelve el texto de la frase unida y la nueva posición en el texto.
@@ -59,10 +59,10 @@ def _match_frase_from(texto, i, primera_palabra):
         
         # Revisa si las siguientes palabras coinciden con la frase esperada
         for esperado in frase[1:]:
-            j = _saltar_espacios(texto, j)
+            j = saltar_espacios(texto, j)
             if j >= len(texto) or not texto[j].isalpha():
                 break
-            siguiente, j = _leer_palabra(texto, j)
+            siguiente, j = leer_palabra(texto, j)
             palabras.append(siguiente)
             if siguiente.lower() != esperado:
                 break
@@ -106,11 +106,11 @@ def tokenizar(texto):
 
         # Caso 3: Si es una letra, leemos la palabra completa
         if char.isalpha():
-            palabra, i = _leer_palabra(texto, i)
+            palabra, i = leer_palabra(texto, i)
             low = palabra.lower()
 
             # Verificamos si es el inicio de una frase FROM (ej: 'de la tabla')
-            frase = _match_frase_from(texto, i, palabra)
+            frase = match_frase_from(texto, i, palabra)
             if frase:
                 texto_frase, i = frase
                 tokens.append(Token("FROM", texto_frase))
