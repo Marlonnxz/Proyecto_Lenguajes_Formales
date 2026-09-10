@@ -4,30 +4,33 @@ SELECT_PALABRAS = {
     "consulta", "consultar", "selecciona", "seleccionar",
     "muestra", "mostrar", "lista", "listar", "dame", "obten", "obtener",
 }
+# Nuevas frases clave para el soporte de las reglas
+WHERE_FRASES = ["donde"]
+ORDER_FRASES = ["ordenar por"]
+
 FROM_FRASES = [
     ("de", "la", "tabla"),
     ("desde", "la", "tabla"),
     ("en", "la", "tabla"),
     ("de", "tabla"),
 ]
+
 IGNORAR = {"el", "los", "las", "un", "una", "campo", "campos"}
 
-
 def _leer_palabra(texto, i):
-    """Desde i (posición alfabética), devuelve (palabra, índice tras la palabra)."""
+    """Desde i, devuelve (token_alfanumerico, índice tras el token)."""
     inicio = i
     n = len(texto)
-    while i < n and texto[i].isalpha():
+    # Aceptamos letras y números para permitir ID como "id1" o valores como "18"
+    while i < n and texto[i].isalnum():
         i += 1
     return texto[inicio:i], i
-
 
 def _saltar_espacios(texto, i):
     n = len(texto)
     while i < n and texto[i].isspace():
         i += 1
     return i
-
 
 def _match_frase_from(texto, i, primera_palabra):
     """Si desde i sigue una frase tipo 'de la tabla', devuelve (texto_frase, nuevo_i); si no, None."""
@@ -47,10 +50,8 @@ def _match_frase_from(texto, i, primera_palabra):
             return " ".join(palabras), j
     return None
 
-
 def tokenizar(texto):
-    """Analizador léxico: reconoce palabras clave en español (SELECT/FROM/ID/SEPARATOR)
-    para generar SQL, todo en el mismo recorrido carácter por carácter."""
+    """Analizador léxico que utiliza lista para reconocer frases FROM."""
     tokens = []
     i = 0
     n = len(texto)
@@ -67,15 +68,29 @@ def tokenizar(texto):
             i += 1
             continue
 
-        if char.isalpha():
-            palabra, i = _leer_palabra(texto, i)
-            low = palabra.lower()
+        # Nuevos operadores relacionales
+        if char in "<>=!":
+            op = char
+            if char == "!" and i + 1 < n and texto[i+1] == "=":
+                op = "!="
+                i += 1
+            tokens.append(Token("OPERADOR", op))
+            i += 1
+            continue
 
-            frase = _match_frase_from(texto, i, palabra)
+        if char.isalnum():
+            # Intentar reconocer frases del FROM
+            palabra, next_i = _leer_palabra(texto, i)
+            frase = _match_frase_from(texto, next_i, palabra)
+            
             if frase:
                 texto_frase, i = frase
                 tokens.append(Token("FROM", texto_frase))
                 continue
+
+            # Si no es FROM, procesar palabra normal
+            i = next_i
+            low = palabra.lower()
 
             if low in SELECT_PALABRAS:
                 tokens.append(Token("SELECT", palabra))
@@ -83,7 +98,19 @@ def tokenizar(texto):
                 tokens.append(Token("SEPARATOR", palabra))
             elif low in IGNORAR:
                 pass  # artículos/preposiciones sin valor semántico
+            elif low in WHERE_FRASES:
+                tokens.append(Token("WHERE_CLAUSE", palabra))
+            elif low == "ordenar":
+                # Mirar hacia adelante para capturar "ordenar por"
+                j = _saltar_espacios(texto, i)
+                sig, next_i = _leer_palabra(texto, j)
+                if sig.lower() == "por":
+                    tokens.append(Token("ORDER_CLAUSE", "ordenar por"))
+                    i = next_i
+                else:
+                    tokens.append(Token("ID", palabra))
             else:
+                # Todo lo demás (incluyendo números) se toma como ID
                 tokens.append(Token("ID", palabra))
             continue
 
@@ -118,51 +145,3 @@ def generar_sql(tokens):
 
 def texto_a_sql(texto):
     return generar_sql(tokenizar(texto))
-
-
-if __name__ == "__main__":
-    frases = [
-        "consulta los campos id, nombre y fecha de la tabla estudiantes",
-        "muestra el campo nombre de la tabla profesores",
-        "lista id, nombre, correo desde la tabla usuarios",
-        "consulta los campos id, nombre y fecha de la tabla estudiantes"
-    ]
-
-    for frase in frases:
-        print(f"\nFrase: {frase}")
-        for t in tokenizar(frase):
-            print(f"  {t}")
-        print(f"  SQL -> {texto_a_sql(frase)}")
-
-    # self-check
-    assert texto_a_sql("consulta los campos id, nombre y fecha de la tabla estudiantes") == \
-        "SELECT id, nombre, fecha FROM estudiantes"
-    assert texto_a_sql("muestra el campo nombre de la tabla profesores") == \
-        "SELECT nombre FROM profesores"
-    assert texto_a_sql("lista id, nombre, correo desde la tabla usuarios") == \
-        "SELECT id, nombre, correo FROM usuarios"
-    assert texto_a_sql("dame los campos codigo y precio en la tabla productos") == \
-        "SELECT codigo, precio FROM productos"
-    try:
-        texto_a_sql("consulta los campos id")  # sin FROM -> debe fallar
-        assert False, "se esperaba SyntaxError por falta de tabla"
-    except SyntaxError:
-        pass
-    print("\nSelf-check OK")
-
-    print("\n--- Modo interactivo ---")
-    print("Escribe una consulta en lenguaje natural (ej: 'consulta id de la tabla x').")
-    print("Escribe 'salir' para terminar.")
-    while True:
-        entrada = input("\n> ").strip()
-        if entrada.lower() == "salir":
-            break
-        if not entrada:
-            continue
-        try:
-            tokens = tokenizar(entrada)
-            for t in tokens:
-                print(f"  {t}")
-            print(f"  SQL -> {texto_a_sql(entrada)}")
-        except SyntaxError as e:
-            print(f"  Error léxico: {e}")

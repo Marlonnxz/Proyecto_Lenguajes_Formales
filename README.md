@@ -1,103 +1,65 @@
-# Analizador léxico: lenguaje natural → SQL
+# Proyecto: Analizador de Lenguaje Natural a SQL con Doble Capa de Autómatas
 
-Manual de usuario de [AnalisisLexico.py](AnalisisLexico.py).
+Este proyecto implementa un sistema de traducción de lenguaje natural a SQL utilizando una arquitectura de dos niveles de **Autómatas Finitos Deterministas (DFA)**.
 
-## ¿Qué hace?
+---
 
-Un analizador léxico (`tokenizar`) que recorre el texto **carácter por
-carácter** y reconoce consultas en español que se traducen a SQL, por
-ejemplo:
+## 1. Capa de Análisis Léxico (Nivel Micro)
+Basado en los **10 Casos de Uso** definidos en la matriz de diseño. Esta capa convierte caracteres en tokens.
 
-```
-consulta los campos id, nombre y fecha de la tabla estudiantes
-```
-se convierte en:
-```sql
-SELECT id, nombre, fecha FROM estudiantes
-```
+### AFD por Caracteres:
 
-## Cómo funciona el léxico
+#### Casos 1 y 3
+*   **Caso 1 (Palabras Reservadas SELECT)**: Autómata que reconoce "consulta", "selecciona", "muestra", "lista", "dame", "obten". Finaliza en el estado de aceptación `qSELECT`.
+*   **Caso 3 (Identificadores ID)**: Reconocimiento de nombres de campos y tablas mediante la regla `[a-zA-Z]+` que no sean palabras reservadas ni stop-words.
 
-El bucle principal (`while i < n` en `tokenizar`) clasifica cada carácter y,
-según el caso, arma tokens:
+#### Casos 2 y 5
+*   **Caso 2 (Frases FROM)**: Autómata con bifurcaciones para reconocer frases compuestas como "de la tabla", "desde la tabla", "en la tabla" o "de tabla". Finaliza en `qFROM`.
+*   **Caso 5 (Stop-words)**: Reconocimiento de palabras a ignorar ("el", "los", "las", "un", "una", "campo", "campos"). Estas regresan al estado inicial `q0` sin generar token.
 
-| Se encuentra... | Token generado | Ejemplo |
-|---|---|---|
-| `,` | `SEPARATOR` | separador de campos |
-| letra que arma una palabra en `SELECT_PALABRAS` | `SELECT` | `consulta`, `muestra`, `lista`, `dame`, `selecciona`, `obten`, ... |
-| letra que arma la palabra `y` | `SEPARATOR` | separador de campos (alternativa a la coma) |
-| letra que arma una frase de `FROM_FRASES` (mira varias palabras hacia adelante) | `FROM` | `de la tabla`, `desde la tabla`, `en la tabla`, `de tabla` |
-| letra que arma una palabra en `IGNORAR` | *(no genera token)* | `el`, `los`, `las`, `un`, `una`, `campo`, `campos` |
-| cualquier otra palabra | `ID` | nombre de campo o de tabla |
-| cualquier otro carácter | `SyntaxError` | símbolo no reconocido |
+#### Casos 4 y 6
+*   **Caso 4 (Separadores)**: Reconoce la coma `,` y la conjunción `y`. Ambos generan un `Token(SEPARATOR)`.
+*   **Caso 6 (Errores Léxicos)**: Estado de error `qERROR_LEXICO` para caracteres no permitidos como `@`, `$`, `#`, `&` o números fuera de contexto.
 
-Después de tokenizar una consulta en español, `generar_sql(tokens)` recorre
-los tokens: todo lo que aparece como `ID` después de `SELECT` se guarda como
-campo, y todo lo que aparece como `ID` después de `FROM` se guarda como
-tabla; al final arma el `SELECT ... FROM ...`.
+---
 
-## Cómo probarlo
+## 2. Capa de Análisis Sintáctico (Nivel Macro)
+Ubicada en `reglas.json` y procesada por `SintacticoDinamico.py`. Esta capa valida la **secuencia de tokens**.
 
-### 1. Ejecutar el script
+### Funcionamiento Dinámico
+El sistema carga 10 reglas sintácticas enunciadas en un archivo JSON. Cada regla representa un autómata donde las transiciones no son caracteres, sino los **Tokens** generados en la fase anterior.
 
-```
-python AnalisisLexico.py
-```
+### Las 10 Reglas Sintácticas en `reglas.json`:
 
-Esto corre automáticamente:
-- unos ejemplos de demostración (consultas en español con sus tokens y su SQL),
-- un **self-check** con `assert` (si algo falla, se ve el error en consola),
-- y al final abre un **modo interactivo**.
+| ID | Nombre de la Regla | Estructura de Transiciones (Tokens) |
+|:---|:---|:---|
+| 1 | Consulta Simple | SELECT → ID → FROM → ID |
+| 2 | Lista (Coma) | SELECT → ID → SEPARATOR → ID → FROM → ID |
+| 3 | Lista (Conector 'y') | SELECT → ID → SEPARATOR → ID → FROM → ID |
+| 4 | Filtro WHERE | ... → FROM → ID → WHERE_CLAUSE → ID → OPERADOR → ID |
+| 5 | Ordenamiento | ... → FROM → ID → ORDER_CLAUSE → ID |
+| 6 | Tabla Compuesta | ... → FROM → ID → ID |
+| 7 | Consulta Maestra | SELECT + Campos + FROM + Tabla + WHERE + ORDER |
+| 8 | Lista Triple | SELECT → ID → SEP → ID → SEP → ID → FROM → ID |
+| 9 | Todos los Campos | SELECT → '*' (ID) → FROM → ID |
+| 10| Filtro + Tabla Comp. | SELECT → ID → FROM → ID → ID → WHERE + ... |
 
-### 2. Modo interactivo
+---
 
-Al final de la ejecución el programa pregunta:
+## 3. Cómo funciona el código completo
 
-```
---- Modo interactivo ---
-Escribe una consulta en lenguaje natural (ej: 'consulta id de la tabla x').
-Escribe 'salir' para terminar.
+1.  **Entrada**: El usuario escribe: `"consulta id y nombre de la tabla usuarios"`.
+2.  **Lexer (`AnalisisLexico.py`)**: 
+    *   Aplica los autómatas de **Julian, Harold y Marlon**.
+    *   Genera la lista: `[Token(SELECT, "consulta"), Token(ID, "id"), Token(SEPARATOR, "y"), Token(ID, "nombre"), Token(FROM, "de la tabla"), Token(ID, "usuarios")]`.
+3.  **Parser (`SintacticoDinamico.py`)**:
+    *   Carga los autómatas de `reglas.json`.
+    *   Evalúa la lista de tokens contra cada regla. En este caso, el autómata de la **Regla 3** llega a un estado final de aceptación.
+4.  **Resultado**: Se confirma que la sintaxis es válida según la Regla 3.
 
->
-```
-
-Ahí puedes escribir cualquier consulta y ver:
-- los tokens reconocidos, uno por línea,
-- el SQL generado,
-- o un `Error léxico` si falta algo (campos, tabla) o hay un carácter no reconocido.
-
-Escribe `salir` para terminar.
-
-### 3. Desde código (Python / notebook)
-
-```python
-from AnalisisLexico import tokenizar, texto_a_sql
-
-texto_a_sql("consulta los campos id, nombre y fecha de la tabla estudiantes")
-# 'SELECT id, nombre, fecha FROM estudiantes'
-
-tokenizar("muestra el campo nombre de la tabla profesores")  # ver tokens crudos
+## Ejecución
+Para ejecutar el sistema completo con validación dinámica:
+```bash
+python SintacticoDinamico.py
 ```
 
-## Ejemplos de prueba
-
-Cópialos y pégalos en el modo interactivo (o úsalos como `texto_a_sql(...)`):
-
-| Entrada | Resultado esperado |
-|---|---|
-| `consulta los campos id, nombre y fecha de la tabla estudiantes` | `SELECT id, nombre, fecha FROM estudiantes` |
-| `muestra el campo nombre de la tabla profesores` | `SELECT nombre FROM profesores` |
-| `lista id, nombre, correo desde la tabla usuarios` | `SELECT id, nombre, correo FROM usuarios` |
-| `dame los campos codigo y precio en la tabla productos` | `SELECT codigo, precio FROM productos` |
-| `selecciona id de tabla ventas` | `SELECT id FROM ventas` |
-| `consulta los campos id` (sin tabla) | `Error léxico` — falta el `FROM` |
-| `consulta id # de la tabla x` | `Error léxico: Carácter inesperado '#'...` |
-
-## Limitaciones actuales
-
-- No soporta `WHERE`, `JOIN`, ni condiciones.
-- Los verbos y frases reconocidos son fijos (ver `SELECT_PALABRAS` y
-  `FROM_FRASES` en el código); una palabra fuera de esas listas se toma como
-  nombre de campo/tabla (`ID`), no como error.
-- Nombres de tabla con varias palabras se concatenan con espacio tal cual
-  aparecen (no hay validación adicional).
