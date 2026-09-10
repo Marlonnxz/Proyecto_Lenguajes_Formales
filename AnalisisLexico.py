@@ -22,7 +22,7 @@ FROM_FRASES = [
 
 IGNORAR = {"el", "los", "las", "un", "una", "campo", "campos"}
 
-def _leer_palabra(texto, i):
+def leer_palabra(texto, i):
     """Desde i, devuelve (token_alfanumerico, índice tras el token)."""
     inicio = i
     n = len(texto)
@@ -31,7 +31,7 @@ def _leer_palabra(texto, i):
         i += 1
     return texto[inicio:i], i
 
-def _saltar_espacios(texto, i):
+def saltar_espacios(texto, i):
     n = len(texto)
     while i < n and texto[i].isspace():
         i += 1
@@ -93,7 +93,7 @@ def tokenizar(texto):
 
         if char.isalnum():
             # Intentar reconocer frases del FROM
-            palabra, next_i = _leer_palabra(texto, i)
+            palabra, next_i = leer_palabra(texto, i)
             frase = _match_frase_from(texto, next_i, palabra)
             
             if frase:
@@ -115,8 +115,8 @@ def tokenizar(texto):
                 tokens.append(Token("WHERE_CLAUSE", palabra))
             elif low == "ordenar":
                 # Mirar hacia adelante para capturar "ordenar por"
-                j = _saltar_espacios(texto, i)
-                sig, next_i = _leer_palabra(texto, j)
+                j = saltar_espacios(texto, i)
+                sig, next_i = leer_palabra(texto, j)
                 if sig.lower() == "por":
                     tokens.append(Token("ORDER_CLAUSE", "ordenar por"))
                     i = next_i
