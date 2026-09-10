@@ -1,5 +1,10 @@
 from Token import Token
 
+# =============================================================================
+# 1. LISTAS Y DICCIONARIOS DE PALABRAS CLAVE
+# =============================================================================
+
+# Palabras que indican una acción de selección (equivalente a SELECT en SQL)
 SELECT_PALABRAS = {
     "consulta", "consultar", "selecciona", "seleccionar",
     "muestra", "mostrar", "lista", "listar", "dame", "obten", "obtener",
@@ -35,19 +40,25 @@ def _saltar_espacios(texto, i):
 def _match_frase_from(texto, i, primera_palabra):
     """Si desde i sigue una frase tipo 'de la tabla', devuelve (texto_frase, nuevo_i); si no, None."""
     candidatas = [f for f in FROM_FRASES if f[0] == primera_palabra.lower()]
+    
+    # Prueba primero las frases más largas
     for frase in sorted(candidatas, key=len, reverse=True):
         j = i
         palabras = [primera_palabra]
+        
+        # Revisa si las siguientes palabras coinciden con la frase esperada
         for esperado in frase[1:]:
-            j = _saltar_espacios(texto, j)
+            j = saltar_espacios(texto, j)
             if j >= len(texto) or not texto[j].isalpha():
                 break
-            siguiente, j = _leer_palabra(texto, j)
+            siguiente, j = leer_palabra(texto, j)
             palabras.append(siguiente)
             if siguiente.lower() != esperado:
                 break
         else:
+            # Si todas las palabras coincidieron, retorna la frase completa
             return " ".join(palabras), j
+            
     return None
 
 def tokenizar(texto):
@@ -59,10 +70,12 @@ def tokenizar(texto):
     while i < n:
         char = texto[i]
 
+        # Caso 1: Si es un espacio en blanco, lo ignoramos y seguimos
         if char.isspace():
             i += 1
             continue
 
+        # Caso 2: Si es una coma, es un separador de campos
         if char == ",":
             tokens.append(Token("SEPARATOR", char))
             i += 1
@@ -114,34 +127,49 @@ def tokenizar(texto):
                 tokens.append(Token("ID", palabra))
             continue
 
+        # Caso 4: Si encuentra un carácter no permitido (ej: $, #, @, números), lanza error
         raise SyntaxError(f"Carácter inesperado: {char!r} en la posición {i}")
 
-    tokens.append(Token("EOF", None))  # marca de fin de entrada
+    # Agregamos el token especial que indica el fin de la entrada
+    tokens.append(Token("EOF", None))
     return tokens
 
 
+# =============================================================================
+# 4. TRADUCCIÓN A SQL
+# =============================================================================
+
 def generar_sql(tokens):
-    """Recorre los tokens (SELECT campos... FROM tabla) y arma el SQL."""
-    campos, tabla, modo = [], None, None
+    """
+    Toma la lista de tokens generada y construye la consulta SQL:
+    SELECT <campos> FROM <tabla>
+    """
+    campos = []
+    tabla = None
+    modo = None
 
     for t in tokens:
         if t.tipo == "SELECT":
-            modo = "campos"
+            modo = "campos"  # Los siguientes identificadores serán nombres de columnas
         elif t.tipo == "FROM":
-            modo = "tabla"
+            modo = "tabla"   # Los siguientes identificadores serán el nombre de la tabla
         elif t.tipo == "ID":
             if modo == "campos":
                 campos.append(t.valor)
             elif modo == "tabla":
+                # Si el nombre de la tabla tiene más de una palabra, se van uniendo
                 tabla = t.valor if tabla is None else f"{tabla} {t.valor}"
         elif t.tipo == "EOF":
             break
 
+    # Si falta la tabla o los campos, la consulta es inválida
     if not campos or not tabla:
         raise SyntaxError("No se reconoció una consulta válida (faltan campos o tabla)")
 
+    # Retorna la sentencia SQL final armada
     return f"SELECT {', '.join(campos)} FROM {tabla}"
 
 
 def texto_a_sql(texto):
+    """Función principal que recibe el texto en lenguaje natural y devuelve la consulta SQL."""
     return generar_sql(tokenizar(texto))
