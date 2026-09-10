@@ -1,0 +1,190 @@
+{
+  "reglas": [
+    {
+      "id": 1,
+      "nombre": "Consulta Simple",
+      "descripcion": "SELECT + ID + FROM + ID",
+      "apuntador": "accion_consulta_simple",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "FROM": "q3" },
+          "q3": { "ID": "q4" }
+        },
+        "finales": ["q4"]
+      }
+    },
+    {
+      "id": 2,
+      "nombre": "Consulta Dos Campos con Coma",
+      "descripcion": "SELECT + ID + SEPARATOR + ID + FROM + ID",
+      "apuntador": "accion_dos_campos_coma",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "SEPARATOR": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" }
+        },
+        "finales": ["q6"]
+      }
+    },
+    {
+      "id": 3,
+      "nombre": "Consulta Dos Campos con 'y'",
+      "descripcion": "SELECT + ID + SEPARATOR('y') + ID + FROM + ID",
+      "apuntador": "accion_dos_campos_y",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "SEPARATOR": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" }
+        },
+        "finales": ["q6"]
+      }
+    },
+    {
+      "id": 4,
+      "nombre": "Consulta con Filtro WHERE",
+      "descripcion": "SELECT + ID + FROM + ID + WHERE + ID + OPERADOR + ID",
+      "apuntador": "accion_filtro_where",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "FROM": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "WHERE_CLAUSE": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "OPERADOR": "q7" },
+          "q7": { "ID": "q8" }
+        },
+        "finales": ["q8"]
+      }
+    },
+    {
+      "id": 5,
+      "nombre": "Consulta con Ordenamiento",
+      "descripcion": "SELECT + ID + FROM + ID + ORDER",
+      "apuntador": "accion_ordenamiento",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "FROM": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "ORDER_CLAUSE": "q5" },
+          "q5": { "ID": "q6" }
+        },
+        "finales": ["q6"]
+      }
+    },
+    {
+      "id": 6,
+      "nombre": "Consulta Tabla Compuesta",
+      "descripcion": "SELECT + ID + FROM + ID + ID",
+      "apuntador": "accion_tabla_compuesta",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "FROM": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "ID": "q5" }
+        },
+        "finales": ["q5"]
+      }
+    },
+    {
+      "id": 7,
+      "nombre": "Consulta Completa (Filtro + Orden)",
+      "descripcion": "SELECT + ID + FROM + ID + WHERE + ID + OP + ID + ORDER + ID",
+      "apuntador": "accion_completa",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "FROM": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "WHERE_CLAUSE": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "OPERADOR": "q7" },
+          "q7": { "ID": "q8" },
+          "q8": { "ORDER_CLAUSE": "q9" },
+          "q9": { "ID": "q10" }
+        },
+        "finales": ["q10"]
+      }
+    },
+    {
+      "id": 8,
+      "nombre": "Lista Tres Campos",
+      "descripcion": "SELECT + ID, ID, ID + FROM + ID",
+      "apuntador": "accion_lista_tres_campos",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "SEPARATOR": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "SEPARATOR": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "FROM": "q7" },
+          "q7": { "ID": "q8" }
+        },
+        "finales": ["q8"]
+      }
+    },
+    {
+      "id": 9,
+      "nombre": "Consulta de Todos los Campos",
+      "descripcion": "SELECT + '*' + FROM + ID",
+      "apuntador": "accion_todos_campos",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "FROM": "q3" },
+          "q3": { "ID": "q4" }
+        },
+        "finales": ["q4"]
+      }
+    },
+    {
+      "id": 10,
+      "nombre": "Consulta con Filtro en Tabla Compuesta",
+      "descripcion": "SELECT + ID + FROM + ID + ID + WHERE + ID + OP + ID",
+      "apuntador": "accion_filtro_tabla_compuesta",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "FROM": "q3" },
+          "q3": { "ID": "q4" },
+          "q4": { "ID": "q5" },
+          "q5": { "WHERE_CLAUSE": "q6" },
+          "q6": { "ID": "q7" },
+          "q7": { "OPERADOR": "q8" },
+          "q8": { "ID": "q9" }
+        },
+        "finales": ["q9"]
+      }
+    }
+  ]
+}

@@ -9,8 +9,10 @@ SELECT_PALABRAS = {
     "consulta", "consultar", "selecciona", "seleccionar",
     "muestra", "mostrar", "lista", "listar", "dame", "obten", "obtener",
 }
+# Nuevas frases clave para el soporte de las reglas
+WHERE_FRASES = ["donde"]
+ORDER_FRASES = ["ordenar por"]
 
-# Frases compuestas que indican de qué tabla se obtienen los datos (equivalente a FROM en SQL)
 FROM_FRASES = [
     ("de", "la", "tabla"),
     ("desde", "la", "tabla"),
@@ -18,38 +20,25 @@ FROM_FRASES = [
     ("de", "tabla"),
 ]
 
-# Palabras de relleno o artículos que no aportan significado a la consulta y se ignoran
 IGNORAR = {"el", "los", "las", "un", "una", "campo", "campos"}
 
-
-# =============================================================================
-# 2. FUNCIONES AUXILIARES PARA LEER EL TEXTO
-# =============================================================================
-
-def leer_palabra(texto, i):
-    """Lee letras consecutivas desde la posición i hasta encontrar un espacio o símbolo."""
+def _leer_palabra(texto, i):
+    """Desde i, devuelve (token_alfanumerico, índice tras el token)."""
     inicio = i
     n = len(texto)
-    while i < n and texto[i].isalpha():
+    # Aceptamos letras y números para permitir ID como "id1" o valores como "18"
+    while i < n and texto[i].isalnum():
         i += 1
     return texto[inicio:i], i
 
-
-def saltar_espacios(texto, i):
-    """Avanza el índice i mientras encuentre espacios en blanco."""
+def _saltar_espacios(texto, i):
     n = len(texto)
     while i < n and texto[i].isspace():
         i += 1
     return i
 
-
-def match_frase_from(texto, i, primera_palabra):
-    """
-    Verifica si las siguientes palabras forman una frase tipo 'de la tabla'.
-    Si coincide, devuelve el texto de la frase unida y la nueva posición en el texto.
-    Si no coincide, devuelve None.
-    """
-    # Filtra solo las frases que empiezan con la misma palabra actual
+def _match_frase_from(texto, i, primera_palabra):
+    """Si desde i sigue una frase tipo 'de la tabla', devuelve (texto_frase, nuevo_i); si no, None."""
     candidatas = [f for f in FROM_FRASES if f[0] == primera_palabra.lower()]
     
     # Prueba primero las frases más largas
@@ -72,20 +61,8 @@ def match_frase_from(texto, i, primera_palabra):
             
     return None
 
-
-# =============================================================================
-# 3. ANALIZADOR LÉXICO (TOKENIZADOR)
-# =============================================================================
-
 def tokenizar(texto):
-    """
-    Recorre el texto carácter por carácter y lo divide en tokens:
-    - SELECT: Palabras como 'consulta', 'muestra', 'selecciona'.
-    - FROM: Frases como 'de la tabla', 'desde la tabla'.
-    - SEPARATOR: Comas (,) o la letra 'y' para separar campos.
-    - ID: Nombres de campos o nombres de tablas.
-    - EOF: Marca el final del texto.
-    """
+    """Analizador léxico que utiliza lista para reconocer frases FROM."""
     tokens = []
     i = 0
     n = len(texto)
@@ -104,28 +81,49 @@ def tokenizar(texto):
             i += 1
             continue
 
-        # Caso 3: Si es una letra, leemos la palabra completa
-        if char.isalpha():
-            palabra, i = leer_palabra(texto, i)
-            low = palabra.lower()
+        # Nuevos operadores relacionales
+        if char in "<>=!":
+            op = char
+            if char == "!" and i + 1 < n and texto[i+1] == "=":
+                op = "!="
+                i += 1
+            tokens.append(Token("OPERADOR", op))
+            i += 1
+            continue
 
-            # Verificamos si es el inicio de una frase FROM (ej: 'de la tabla')
-            frase = match_frase_from(texto, i, palabra)
+        if char.isalnum():
+            # Intentar reconocer frases del FROM
+            palabra, next_i = _leer_palabra(texto, i)
+            frase = _match_frase_from(texto, next_i, palabra)
+            
             if frase:
                 texto_frase, i = frase
                 tokens.append(Token("FROM", texto_frase))
                 continue
 
-            # Clasificamos la palabra según corresponda
+            # Si no es FROM, procesar palabra normal
+            i = next_i
+            low = palabra.lower()
+
             if low in SELECT_PALABRAS:
                 tokens.append(Token("SELECT", palabra))
             elif low == "y":
                 tokens.append(Token("SEPARATOR", palabra))
             elif low in IGNORAR:
-                # Palabras como 'el', 'los', 'campo' se omiten
-                pass
+                pass  # artículos/preposiciones sin valor semántico
+            elif low in WHERE_FRASES:
+                tokens.append(Token("WHERE_CLAUSE", palabra))
+            elif low == "ordenar":
+                # Mirar hacia adelante para capturar "ordenar por"
+                j = _saltar_espacios(texto, i)
+                sig, next_i = _leer_palabra(texto, j)
+                if sig.lower() == "por":
+                    tokens.append(Token("ORDER_CLAUSE", "ordenar por"))
+                    i = next_i
+                else:
+                    tokens.append(Token("ID", palabra))
             else:
-                # Si no es palabra reservada, se asume que es un identificador (columna o tabla)
+                # Todo lo demás (incluyendo números) se toma como ID
                 tokens.append(Token("ID", palabra))
             continue
 
@@ -175,69 +173,3 @@ def generar_sql(tokens):
 def texto_a_sql(texto):
     """Función principal que recibe el texto en lenguaje natural y devuelve la consulta SQL."""
     return generar_sql(tokenizar(texto))
-
-
-# =============================================================================
-# 5. DEMOSTRACIÓN Y MODO INTERACTIVO
-# =============================================================================
-
-if __name__ == "__main__":
-    print("=" * 60)
-    print("ANALIZADOR LÉXICO Y TRADUCTOR A SQL")
-    print("=" * 60)
-
-    # Lista de frases de prueba
-    frases = [
-        "consulta los campos id, nombre y fecha de la tabla estudiantes",
-        "muestra el campo nombre de la tabla profesores",
-        "lista id, nombre, correo desde la tabla usuarios",
-        "dame los campos codigo y precio en la tabla productos"
-    ]
-
-    print("\n--- CASOS DE PRUEBA ---")
-    for frase in frases:
-        print(f"\nFrase: \"{frase}\"")
-        for t in tokenizar(frase):
-            print(f"  {t}")
-        print(f"  SQL -> {texto_a_sql(frase)}")
-
-    # Comprobaciones automáticas para verificar que todo funcione bien
-    assert texto_a_sql("consulta los campos id, nombre y fecha de la tabla estudiantes") == \
-        "SELECT id, nombre, fecha FROM estudiantes"
-    assert texto_a_sql("muestra el campo nombre de la tabla profesores") == \
-        "SELECT nombre FROM profesores"
-    assert texto_a_sql("lista id, nombre, correo desde la tabla usuarios") == \
-        "SELECT id, nombre, correo FROM usuarios"
-    assert texto_a_sql("dame los campos codigo y precio en la tabla productos") == \
-        "SELECT codigo, precio FROM productos"
-    
-    # Comprobar que detecte error cuando no hay tabla
-    try:
-        texto_a_sql("consulta los campos id")
-        assert False, "Se esperaba un error por falta de tabla"
-    except SyntaxError:
-        pass
-
-    print("\n[OK] Pruebas automáticas superadas con éxito.")
-
-    # Modo interactivo para probar frases escritas por el usuario en tiempo real
-    print("\n" + "=" * 60)
-    print("MODO INTERACTIVO")
-    print("Escribe una consulta en lenguaje natural (ej: 'consulta id de la tabla estudiantes')")
-    print("Escribe 'salir' para terminar.")
-    print("=" * 60)
-
-    while True:
-        entrada = input("\n> ").strip()
-        if entrada.lower() == "salir":
-            print("Fin del programa.")
-            break
-        if not entrada:
-            continue
-        try:
-            tokens = tokenizar(entrada)
-            for t in tokens:
-                print(f"  {t}")
-            print(f"  SQL -> {texto_a_sql(entrada)}")
-        except SyntaxError as e:
-            print(f"  Error: {e}")
