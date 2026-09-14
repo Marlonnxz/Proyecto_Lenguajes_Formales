@@ -25,9 +25,16 @@ from SintacticoDinamico import SintacticoDinamico
 # =============================================================================
 EXTENSION = ".esql"
 PATRON_PETICION = re.compile(r"^peticion\s*=\s*(.*)$", re.IGNORECASE)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-REGLAS_PATH = os.path.join(BASE_DIR, "reglas.json")
-PRUEBAS_DIR = os.path.join(BASE_DIR, "pruebas")
+# Configuración de rutas (compatible con ejecución directa y PyInstaller --onefile)
+if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+    BUNDLE_DIR = sys._MEIPASS
+    APP_DIR = os.path.dirname(sys.executable)
+else:
+    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
+    APP_DIR = BUNDLE_DIR
+
+REGLAS_PATH = os.path.join(BUNDLE_DIR, "reglas.json")
+PRUEBAS_DIR = os.path.join(APP_DIR, "pruebas")
 
 
 def obtener_parser():

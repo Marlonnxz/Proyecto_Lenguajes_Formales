@@ -1,0 +1,9 @@
+services:
+  esql:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: esql-language
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

@@ -9,3 +9,11 @@ class Token:
     def __repr__(self):
         # Permite imprimir el token de forma clara en consola: Token(TIPO, 'valor')
         return f"Token({self.tipo}, {self.valor!r})"
+
+    def to_json(self):
+        # Serializa el token para respuestas JSON en la API
+        return {
+            "token": self.tipo,
+            "tipo": self.tipo,
+            "valor": self.valor
+        }
