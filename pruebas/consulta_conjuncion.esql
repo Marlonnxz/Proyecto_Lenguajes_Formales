@@ -1,0 +1,9 @@
+# Archivo de prueba: Consulta con conjunción 'y'
+# Sintaxis válida según Regla 3 (Consulta Dos Campos con 'y')
+peticion= consulta nombre y correo de la tabla clientes
+
+# Texto suelto sin peticion que será ignorado
+Metadatos de la consulta
+
+# Otra variante válida con diferente verbo de selección
+peticion = muestra salario y puesto de la tabla empleados

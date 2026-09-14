@@ -1,0 +1,6 @@
+# Archivo de prueba: Casos con errores sintácticos
+# Error: Omisión de campos entre SELECT y FROM (estructura gramatical no válida)
+peticion= selecciona de la tabla usuarios
+
+# Error: Falta de frase FROM (estructura incompleta)
+peticion = consulta nombre, edad usuarios

@@ -1,0 +1,9 @@
+# Archivo de prueba: Consulta básica con comas
+# Sintaxis válida según Regla 2 (Consulta Dos Campos con Coma)
+peticion= selecciona nombre, edad de la tabla usuarios
+
+# Línea de texto normal que debe ser ignorada por no tener la palabra reservada 'peticion='
+Configuracion del sistema o nota informativa
+
+# Sintaxis válida según Regla 8 (Lista Tres Campos)
+peticion = selecciona id, nombre, correo de la tabla clientes
