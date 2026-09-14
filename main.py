@@ -187,13 +187,20 @@ def modo_lote(parser):
     print("#" * 70 + "\n")
 
 
-def modo_interactivo(parser):
+def modo_interactivo(parser, es_doble_clic=False):
     """
-    Modo REPL para probar sentencias en lenguaje natural en tiempo real.
+    Modo REPL interactivo:
+    Permite probar sentencias manualmente sin que la consola se cierre.
     """
     print("\n" + "=" * 70)
-    print("MODO INTERACTIVO (REPL) - Lenguaje Natural a SQL (.esql)")
-    print("Escribe tus sentencias o 'salir' / 'exit' para terminar.")
+    print("COMPILADOR DE LENGUAJE NATURAL A SQL (ESQL) - MODO INTERACTIVO")
+    print("=" * 70)
+    print("Escribe tus sentencias directamente o con 'peticion = <consulta>'.")
+    print("Comandos disponibles:")
+    print("  - 'test' o 'lote' : Ejecutar todos los archivos en la carpeta 'pruebas/'")
+    print("  - 'ayuda'         : Mostrar la guía de opciones")
+    print("  - 'limpiar'       : Limpiar pantalla")
+    print("  - 'salir'         : Cerrar la aplicación")
     print("=" * 70)
 
     num_sentencia = 1
@@ -205,41 +212,67 @@ def modo_interactivo(parser):
             break
 
         entrada_limpia = entrada.strip()
-        if entrada_limpia.lower() in ("salir", "exit", "quit"):
-            print("Finalizando sesión interactiva.")
-            break
-
         if not entrada_limpia:
             continue
 
+        cmd = entrada_limpia.lower()
+        if cmd in ("salir", "exit", "quit"):
+            print("Finalizando sesión de ESQL.")
+            break
+
+        if cmd in ("test", "lote"):
+            modo_lote(parser)
+            continue
+
+        if cmd in ("ayuda", "help", "?"):
+            mostrar_ayuda()
+            continue
+
+        if cmd in ("limpiar", "cls", "clear"):
+            os.system("cls" if os.name == "nt" else "clear")
+            continue
+
+        # Soporte para arrastrar un archivo .esql a la consola
+        if entrada_limpia.lower().endswith(EXTENSION.lower()) and os.path.isfile(entrada_limpia):
+            procesar_archivo(entrada_limpia, parser)
+            continue
+
+        # Procesar sentencia en lenguaje natural
         procesar_linea(entrada, num_sentencia, parser, requerir_peticion=False)
         num_sentencia += 1
+
+    if es_doble_clic or getattr(sys, "frozen", False):
+        try:
+            input("\nPresione [Enter] para cerrar la ventana...")
+        except Exception:
+            pass
 
 
 def mostrar_ayuda():
     """Muestra la sintaxis de uso y opciones de main.py."""
     ayuda = f"""
-Compilador de Lenguaje Natural a SQL
-Uso: python main.py [OPCIÓN | RUTA_ARCHIVO]
+Compilador de Lenguaje Natural a SQL (ESQL)
+Uso: esql [OPCIÓN | RUTA_ARCHIVO]
 
 Opciones y Modos:
-  python main.py <archivo{EXTENSION}>
+  esql <archivo{EXTENSION}>
       Procesa un archivo individual especificado. Valida estrictamente la extensión {EXTENSION}.
 
-  python main.py --test
-  python main.py
+  esql --test
       Modo Lote: Ejecuta secuencialmente todos los archivos '{EXTENSION}' en la carpeta 'pruebas/'.
 
-  python main.py -i, --interactive
-      Modo Interactivo (REPL): Abre la consola interactiva con prompt 'ESQL> '.
+  esql -i, --interactive
+  esql (sin argumentos)
+      Modo Interactivo (REPL): Mantiene la consola abierta con el prompt 'ESQL> '
+      para ingresar sentencias interactivamente sin que se cierre.
 
-  python main.py -h, --help
+  esql -h, --help
       Muestra este mensaje de ayuda.
 
 Ejemplos:
-  python main.py pruebas/consulta_basica.esql
-  python main.py --test
-  python main.py -i
+  esql pruebas/consulta_basica.esql
+  esql --test
+  esql
 """
     print(ayuda)
 
@@ -247,9 +280,9 @@ Ejemplos:
 def main():
     parser = obtener_parser()
 
-    # Caso 1: Sin argumentos -> Ejecutar lote de pruebas
+    # Caso 1: Sin argumentos -> Iniciar modo interactivo persistente (no se cierra)
     if len(sys.argv) == 1:
-        modo_lote(parser)
+        modo_interactivo(parser, es_doble_clic=True)
         return
 
     arg = sys.argv[1].strip()
@@ -262,11 +295,16 @@ def main():
     # Caso 3: Lote de pruebas explícito
     if arg == "--test":
         modo_lote(parser)
+        if getattr(sys, "frozen", False):
+            try:
+                input("\nPresione [Enter] para cerrar...")
+            except Exception:
+                pass
         return
 
-    # Caso 4: Modo interactivo
+    # Caso 4: Modo interactivo explícito
     if arg in ("-i", "--interactive"):
-        modo_interactivo(parser)
+        modo_interactivo(parser, es_doble_clic=False)
         return
 
     # Caso 5: Archivo individual
