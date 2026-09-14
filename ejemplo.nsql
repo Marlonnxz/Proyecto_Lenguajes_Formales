@@ -1,0 +1,17 @@
+# Archivo de prueba de lenguaje natural a SQL (.NSQL)
+# Proyecto Lenguajes Formales - UPTC Sogamoso
+
+# Consulta simple (Regla 1)
+consulta id de la tabla usuarios
+
+# Consulta dos campos con coma (Regla 2)
+selecciona id, nombre de la tabla clientes
+
+# Consulta dos campos con 'y' (Regla 3)
+muestra id y edad desde la tabla empleados
+
+# Consulta con filtro WHERE (Regla 4)
+consulta id de la tabla productos donde precio > 100
+
+# Consulta con ordenamiento (Regla 5)
+lista nombre en la tabla clientes ordenar por fecha
