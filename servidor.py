@@ -5,25 +5,22 @@ Servidor API REST con FastAPI para el compilador del lenguaje ESQL
 Proyecto: Lenguajes Formales y Teoría de la Computación
 """
 
+import json
 import os
-import re
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from AnalisisLexico import tokenizar
-from SintacticoDinamico import SintacticoDinamico
+
+from compilador import BUNDLE_DIR, MODOS, REGLAS_PATH, compilar
 
 app = FastAPI(
     title="ESQL Language",
-    description="API para ejecutar programas del lenguaje ESQL",
+    description="API y consola web para ejecutar programas del lenguaje ESQL",
     version="1"
 )
 
-# Inicializar parser con reglas del lenguaje
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-REGLAS_PATH = os.path.join(BASE_DIR, "reglas.json")
-parser = SintacticoDinamico(REGLAS_PATH)
-
-PATRON_PETICION = re.compile(r"^peticion\s*=\s*(.*)$", re.IGNORECASE)
+CONSOLA_PATH = os.path.join(BUNDLE_DIR, "consola.html")
 
 
 class CodigoRequest(BaseModel):
@@ -31,58 +28,49 @@ class CodigoRequest(BaseModel):
 
 
 @app.get("/")
-def inicio():
-    """Endpoint inicial con información del lenguaje y versión."""
+def consola():
+    """Consola web interactiva del lenguaje ESQL."""
+    return FileResponse(CONSOLA_PATH, media_type="text/html")
+
+
+@app.get("/info")
+def info():
+    """Información del lenguaje, versión y modos de salida disponibles."""
     return {
         "lenguaje": "ESQL",
         "version": "v1.0",
-        "estado": "En desarrollo"
+        "estado": "En desarrollo",
+        "modos": list(MODOS),
+    }
+
+
+@app.get("/reglas")
+def listar_reglas():
+    """Gramática soportada: reglas sintácticas cargadas desde reglas.json."""
+    with open(REGLAS_PATH, "r", encoding="utf-8") as archivo:
+        reglas = json.load(archivo)["reglas"]
+    return {
+        "total": len(reglas),
+        "reglas": [
+            {"id": r["id"], "nombre": r["nombre"], "descripcion": r["descripcion"]}
+            for r in reglas
+        ],
     }
 
 
 @app.post("/iniciar")
 def ejecutar_codigo(request: CodigoRequest):
     """
-    Endpoint para procesar y ejecutar una sentencia en lenguaje natural ESQL:
-    1. Extrae la consulta (soporta 'peticion = ...' o consulta directa).
-    2. Realiza el análisis léxico obteniendo los tokens.
-    3. Ejecuta el análisis sintáctico dinámico contra reglas.json.
-    4. Retorna resultado traducido a SQL, regla aplicada y lista de tokens.
+    Procesa y ejecuta una sentencia ESQL.
+
+    Acepta un modo de salida opcional como palabra clave inicial:
+      - "tokens: <consulta>"  -> solo la lista de tokens
+      - "sql: <consulta>"     -> solo el SQL generado
+      - "regla: <consulta>"   -> solo la regla sintáctica aplicada
+      - sin prefijo           -> respuesta completa
+    La consulta admite el formato 'peticion = <consulta>' o directa.
     """
-    try:
-        codigo = request.codigo.strip()
-        if not codigo:
-            return {"error": "No se ingreso codigo"}
-
-        # Soporte para formato 'peticion = consulta' o consulta directa
-        match = PATRON_PETICION.match(codigo)
-        consulta = match.group(1).strip() if match else codigo
-
-        if not consulta:
-            return {"error": "Asignación 'peticion=' vacía (no se especificó consulta)"}
-
-        # Análisis Léxico
-        tokens = tokenizar(consulta)
-
-        # Análisis Sintáctico Dinámico
-        regla, sql = parser.procesar_consulta(tokens)
-
-        if not regla:
-            raise SyntaxError("La consulta no coincide con ninguna regla sintáctica válida")
-
-        return {
-            "exito": True,
-            "resultado": sql,
-            "regla": regla["nombre"],
-            "tokens": [
-                token.to_json()
-                for token in tokens
-            ]
-        }
-    except SyntaxError as error:
-        return {"error": str(error)}
-    except Exception as error:
-        return {"error": f"Error interno: {str(error)}"}
+    return compilar(request.codigo)
 
 
 if __name__ == "__main__":

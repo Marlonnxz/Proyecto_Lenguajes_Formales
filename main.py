@@ -16,36 +16,37 @@ if sys.version_info >= (3, 7):
     except Exception:
         pass
 
-import re
-from AnalisisLexico import tokenizar
-from SintacticoDinamico import SintacticoDinamico
+from compilador import (
+    EXTENSION,
+    PATRON_PETICION,
+    PRUEBAS_DIR,
+    compilar,
+)
+from compilador import obtener_parser as _crear_parser
 
-# =============================================================================
-# CONSTANTES Y CONFIGURACIÓN
-# =============================================================================
-EXTENSION = ".esql"
-PATRON_PETICION = re.compile(r"^peticion\s*=\s*(.*)$", re.IGNORECASE)
-# Configuración de rutas (compatible con ejecución directa y PyInstaller --onefile)
-if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
-    BUNDLE_DIR = sys._MEIPASS
-    APP_DIR = os.path.dirname(sys.executable)
-else:
-    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
-    APP_DIR = BUNDLE_DIR
-
-REGLAS_PATH = os.path.join(BUNDLE_DIR, "reglas.json")
-PRUEBAS_DIR = os.path.join(APP_DIR, "pruebas")
+ETIQUETA_ERROR = {
+    "lexico": "Error Léxico",
+    "sintactico": "Error Sintáctico",
+    "semantico": "Error Semántico",
+    "entrada": "Error",
+}
 
 
-def obtener_parser():
-    """Inicializa y retorna la instancia del analizador sintáctico dinámico."""
-    if not os.path.isfile(REGLAS_PATH):
-        print(f"[Error Crítico]: No se encontró el archivo de reglas en '{REGLAS_PATH}'.")
+def verificar_parser():
+    """Carga las reglas al arrancar para fallar rápido si falta reglas.json."""
+    try:
+        _crear_parser()
+    except FileNotFoundError as error:
+        print(f"[Error Crítico]: {error}.")
         sys.exit(1)
-    return SintacticoDinamico(REGLAS_PATH)
 
 
-def procesar_linea(linea, num_linea, parser, requerir_peticion=True):
+def formato_token(t):
+    """Reproduce el formato Token(TIPO, 'valor') a partir del token serializado."""
+    return f"Token({t['tipo']}, {t['valor']!r})"
+
+
+def procesar_linea(linea, num_linea, requerir_peticion=True):
     """
     Procesa una única línea de código:
     1. Limpieza de espacios y comprobación de comentarios.
@@ -82,36 +83,24 @@ def procesar_linea(linea, num_linea, parser, requerir_peticion=True):
     if match:
         print(f"    Petición Asignada: \"{consulta}\"")
 
-    # 1. Fase de Análisis Léxico
-    try:
-        tokens = tokenizar(consulta)
-    except SyntaxError as e_lex:
-        print(f"    [Error Léxico]: {e_lex}")
-        return False
-    except Exception as e_gen:
-        print(f"    [Error Inesperado en Léxico]: {e_gen}")
-        return False
+    resultado = compilar(consulta)
 
-    # Imprimir tokens generados de forma legible
-    tokens_str = ", ".join(repr(t) for t in tokens)
-    print(f"    Tokens: [{tokens_str}]")
+    if resultado.get("tokens"):
+        print(f"    Tokens: [{', '.join(formato_token(t) for t in resultado['tokens'])}]")
 
-    # 2. Fase de Análisis Sintáctico Dinámico
-    try:
-        regla, sql = parser.procesar_consulta(tokens)
-        if regla is not None:
-            print(f"    [OK] Regla Sintáctica: {regla['nombre']} (ID: {regla.get('id', 'N/A')})")
-            print(f"    SQL Generado: {sql}")
-            return True
-        else:
-            print(f"    [Error Sintáctico]: La sentencia no coincide con ninguna estructura gramatical válida.")
-            return False
-    except Exception as e_sint:
-        print(f"    [Error Inesperado en Sintáctico]: {e_sint}")
+    if not resultado["exito"]:
+        etiqueta = ETIQUETA_ERROR.get(resultado.get("fase"), "Error")
+        print(f"    [{etiqueta}]: {resultado['error']}")
         return False
 
+    if resultado.get("regla"):
+        print(f"    [OK] Regla Sintáctica: {resultado['regla']} (ID: {resultado.get('regla_id', 'N/A')})")
+    if resultado.get("resultado"):
+        print(f"    SQL Generado: {resultado['resultado']}")
+    return True
 
-def procesar_archivo(ruta_archivo, parser):
+
+def procesar_archivo(ruta_archivo):
     """
     Valida y procesa un archivo con extensión .esql línea por línea.
     """
@@ -138,7 +127,7 @@ def procesar_archivo(ruta_archivo, parser):
     try:
         with open(ruta_archivo, "r", encoding="utf-8") as f:
             for num_linea, linea in enumerate(f, start=1):
-                res = procesar_linea(linea, num_linea, parser)
+                res = procesar_linea(linea, num_linea)
                 if res is True:
                     total_lineas += 1
                     correctas += 1
@@ -155,7 +144,7 @@ def procesar_archivo(ruta_archivo, parser):
     return errores == 0
 
 
-def modo_lote(parser):
+def modo_lote():
     """
     Busca y ejecuta secuencialmente todos los archivos .esql en la carpeta 'pruebas/'.
     """
@@ -179,7 +168,7 @@ def modo_lote(parser):
 
     archivos_ok = 0
     for archivo in archivos_esql:
-        if procesar_archivo(archivo, parser):
+        if procesar_archivo(archivo):
             archivos_ok += 1
 
     print("\n" + "#" * 70)
@@ -187,7 +176,7 @@ def modo_lote(parser):
     print("#" * 70 + "\n")
 
 
-def modo_interactivo(parser, es_doble_clic=False):
+def modo_interactivo(es_doble_clic=False):
     """
     Modo REPL interactivo:
     Permite probar sentencias manualmente sin que la consola se cierre.
@@ -196,6 +185,8 @@ def modo_interactivo(parser, es_doble_clic=False):
     print("COMPILADOR DE LENGUAJE NATURAL A SQL (ESQL) - MODO INTERACTIVO")
     print("=" * 70)
     print("Escribe tus sentencias directamente o con 'peticion = <consulta>'.")
+    print("Modos de salida: prefija la sentencia con 'tokens:', 'sql:' o 'regla:'")
+    print("                 para recibir unicamente esa parte del resultado.")
     print("Comandos disponibles:")
     print("  - 'test' o 'lote' : Ejecutar todos los archivos en la carpeta 'pruebas/'")
     print("  - 'ayuda'         : Mostrar la guía de opciones")
@@ -221,7 +212,7 @@ def modo_interactivo(parser, es_doble_clic=False):
             break
 
         if cmd in ("test", "lote"):
-            modo_lote(parser)
+            modo_lote()
             continue
 
         if cmd in ("ayuda", "help", "?"):
@@ -234,11 +225,11 @@ def modo_interactivo(parser, es_doble_clic=False):
 
         # Soporte para arrastrar un archivo .esql a la consola
         if entrada_limpia.lower().endswith(EXTENSION.lower()) and os.path.isfile(entrada_limpia):
-            procesar_archivo(entrada_limpia, parser)
+            procesar_archivo(entrada_limpia)
             continue
 
         # Procesar sentencia en lenguaje natural
-        procesar_linea(entrada, num_sentencia, parser, requerir_peticion=False)
+        procesar_linea(entrada, num_sentencia, requerir_peticion=False)
         num_sentencia += 1
 
     if es_doble_clic or getattr(sys, "frozen", False):
@@ -278,11 +269,11 @@ Ejemplos:
 
 
 def main():
-    parser = obtener_parser()
+    verificar_parser()
 
     # Caso 1: Sin argumentos -> Iniciar modo interactivo persistente (no se cierra)
     if len(sys.argv) == 1:
-        modo_interactivo(parser, es_doble_clic=True)
+        modo_interactivo(es_doble_clic=True)
         return
 
     arg = sys.argv[1].strip()
@@ -294,7 +285,7 @@ def main():
 
     # Caso 3: Lote de pruebas explícito
     if arg == "--test":
-        modo_lote(parser)
+        modo_lote()
         if getattr(sys, "frozen", False):
             try:
                 input("\nPresione [Enter] para cerrar...")
@@ -304,11 +295,11 @@ def main():
 
     # Caso 4: Modo interactivo explícito
     if arg in ("-i", "--interactive"):
-        modo_interactivo(parser, es_doble_clic=False)
+        modo_interactivo(es_doble_clic=False)
         return
 
     # Caso 5: Archivo individual
-    exito = procesar_archivo(arg, parser)
+    exito = procesar_archivo(arg)
     if not exito:
         sys.exit(1)
 

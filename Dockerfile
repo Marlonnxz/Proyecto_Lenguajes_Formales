@@ -10,8 +10,10 @@ COPY AnalisisLexico.py .
 COPY SintacticoDinamico.py .
 COPY reglas_acciones.py .
 COPY reglas.json .
+COPY compilador.py .
 COPY main.py .
 COPY servidor.py .
+COPY consola.html .
 
 EXPOSE 8000
 
