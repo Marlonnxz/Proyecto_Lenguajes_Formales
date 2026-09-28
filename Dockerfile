@@ -10,6 +10,7 @@ COPY AnalisisLexico.py .
 COPY SintacticoDinamico.py .
 COPY reglas_acciones.py .
 COPY reglas.json .
+COPY db.py .
 COPY compilador.py .
 COPY main.py .
 COPY servidor.py .

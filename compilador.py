@@ -13,6 +13,11 @@ import sys
 from AnalisisLexico import tokenizar
 from SintacticoDinamico import SintacticoDinamico
 
+try:
+    from db import ejecutar_consulta
+except ImportError:
+    ejecutar_consulta = None
+
 EXTENSION = ".esql"
 
 # Rutas (compatible con ejecución directa y con PyInstaller --onefile)
@@ -34,6 +39,8 @@ MODOS = {
     "tokens": ("tokens",),
     "sql": ("resultado",),
     "regla": ("regla", "regla_id", "descripcion"),
+    "ejecutar": ("resultado", "datos"),
+    "datos": ("datos",),
 }
 PATRON_MODO = re.compile(r"^(%s)\s*:?\s+(.+)$" % "|".join(MODOS), re.IGNORECASE)
 
@@ -64,12 +71,12 @@ def extraer_consulta(codigo):
     return match.group(1).strip() if match else codigo.strip()
 
 
-def compilar(codigo):
+def compilar(codigo, ejecutar_db=True):
     """
     Pipeline completo sobre una sentencia ESQL.
 
     Retorna un dict con 'exito'. En éxito incluye solo las claves que pida el modo
-    (todo | tokens | sql | regla). En error incluye 'error' y 'fase'.
+    (todo | tokens | sql | regla | ejecutar | datos). En error incluye 'error' y 'fase'.
     """
     modo, resto = separar_modo(codigo or "")
     if not resto:
@@ -103,6 +110,13 @@ def compilar(codigo):
             "tokens": [t.to_json() for t in tokens],
         }
 
+    datos = None
+    if ejecutar_db and ejecutar_consulta is not None:
+        try:
+            datos = ejecutar_consulta(sql)
+        except Exception as e:
+            datos = {"exito": False, "error": str(e), "columnas": [], "filas": [], "total": 0}
+
     completo = {
         "exito": True,
         "modo": modo,
@@ -112,6 +126,7 @@ def compilar(codigo):
         "regla_id": regla.get("id"),
         "descripcion": regla.get("descripcion"),
         "tokens": [t.to_json() for t in tokens],
+        "datos": datos,
     }
 
     claves = MODOS[modo]
