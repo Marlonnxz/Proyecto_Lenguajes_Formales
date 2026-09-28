@@ -183,13 +183,15 @@ Comandos de la consola:
 Ejemplo:  <span class="sql">consulta nombre y correo de la tabla clientes</span>`;
 
 const EJEMPLOS = [
-  'selecciona nombre, edad de la tabla usuarios',
-  'consulta nombre y correo de la tabla clientes',
-  'muestra salario y puesto de la tabla empleados',
-  'selecciona nombre, precio, stock de la tabla productos',
-  'muestra salario de la tabla empleados donde edad > 25',
-  'lista id de la tabla pedidos ordenar por total',
-  'obten nombre de la tabla usuarios activos',
+  'selecciona todos los datos de la tabla usuarios',
+  'selecciona * de la tabla productos',
+  'selecciona id, nombre, correo, telefono, ciudad de la tabla clientes',
+  'selecciona nombre, edad de la tabla usuarios donde edad > 18',
+  'consulta nombre, telefono de la tabla clientes donde ciudad = \'Bogota\'',
+  'muestra salario, edad de la tabla empleados donde edad > 25 y salario < 6000',
+  'selecciona nombre, edad de la tabla usuarios donde edad entre 20 y 30',
+  'lista id, fecha, total de la tabla pedidos ordenar por total descendente',
+  'selecciona puesto de la tabla empleados agrupar por puesto',
 ];
 
 async function reglas() {

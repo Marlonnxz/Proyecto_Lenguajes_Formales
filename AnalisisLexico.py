@@ -12,6 +12,25 @@ SELECT_PALABRAS = {
 # Nuevas frases clave para el soporte de las reglas
 WHERE_FRASES = ["donde"]
 ORDER_FRASES = ["ordenar por"]
+GROUP_PALABRAS = {"agrupar", "agrupado", "agrupa"}
+
+ORDER_DIR_PALABRAS = {
+    "asc": "ASC",
+    "ascendente": "ASC",
+    "desc": "DESC",
+    "descendente": "DESC",
+}
+
+BETWEEN_PALABRAS = {"entre"}
+
+LOGICAL_PALABRAS = {
+    "o": "OR",
+    "u": "OR",
+    "or": "OR",
+    "and": "AND",
+}
+
+WILDCARD_PALABRAS = {"*", "todo", "todos", "todas"}
 
 FROM_FRASES = [
     ("de", "la", "tabla"),
@@ -20,7 +39,7 @@ FROM_FRASES = [
     ("de", "tabla"),
 ]
 
-IGNORAR = {"el", "los", "las", "un", "una", "campo", "campos"}
+IGNORAR = {"el", "los", "las", "un", "una", "campo", "campos", "dato", "datos"}
 
 def leer_palabra(texto, i):
     """Desde i, devuelve (token_alfanumerico, índice tras el token)."""
@@ -81,11 +100,32 @@ def tokenizar(texto):
             i += 1
             continue
 
-        # Nuevos operadores relacionales
+        # Cadenas de texto entre comillas simples o dobles
+        if char in ("'", '"'):
+            quote = char
+            inicio = i
+            i += 1
+            while i < n and texto[i] != quote:
+                i += 1
+            if i < n:
+                valor_str = texto[inicio+1:i]
+                i += 1
+                tokens.append(Token("STRING", valor_str))
+                continue
+            else:
+                raise SyntaxError(f"Comilla {quote!r} no cerrada iniciada en la posición {inicio}")
+
+        # Asterisco para SELECT *
+        if char == "*":
+            tokens.append(Token("WILDCARD", "*"))
+            i += 1
+            continue
+
+        # Operadores relacionales (=, !=, <, >, <=, >=)
         if char in "<>=!":
             op = char
-            if char == "!" and i + 1 < n and texto[i+1] == "=":
-                op = "!="
+            if i + 1 < n and texto[i+1] == "=":
+                op = char + "="
                 i += 1
             tokens.append(Token("OPERADOR", op))
             i += 1
@@ -107,12 +147,28 @@ def tokenizar(texto):
 
             if low in SELECT_PALABRAS:
                 tokens.append(Token("SELECT", palabra))
+            elif low in WILDCARD_PALABRAS:
+                tokens.append(Token("WILDCARD", "*"))
             elif low == "y":
                 tokens.append(Token("SEPARATOR", palabra))
+            elif low in LOGICAL_PALABRAS:
+                tokens.append(Token("LOGICAL_OP", LOGICAL_PALABRAS[low]))
+            elif low in BETWEEN_PALABRAS:
+                tokens.append(Token("BETWEEN_CLAUSE", "BETWEEN"))
+            elif low in ORDER_DIR_PALABRAS:
+                tokens.append(Token("ORDER_DIR", ORDER_DIR_PALABRAS[low]))
             elif low in IGNORAR:
                 pass  # artículos/preposiciones sin valor semántico
             elif low in WHERE_FRASES:
                 tokens.append(Token("WHERE_CLAUSE", palabra))
+            elif low in GROUP_PALABRAS:
+                j = saltar_espacios(texto, i)
+                sig, next_i = leer_palabra(texto, j)
+                if sig.lower() == "por":
+                    tokens.append(Token("GROUP_CLAUSE", "agrupar por"))
+                    i = next_i
+                else:
+                    tokens.append(Token("ID", palabra))
             elif low == "ordenar":
                 # Mirar hacia adelante para capturar "ordenar por"
                 j = saltar_espacios(texto, i)
@@ -127,7 +183,7 @@ def tokenizar(texto):
                 tokens.append(Token("ID", palabra))
             continue
 
-        # Caso 4: Si encuentra un carácter no permitido (ej: $, #, @, números), lanza error
+        # Caso 4: Si encuentra un carácter no permitido, lanza error
         raise SyntaxError(f"Carácter inesperado: {char!r} en la posición {i}")
 
     # Agregamos el token especial que indica el fin de la entrada
