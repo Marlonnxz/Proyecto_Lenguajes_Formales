@@ -97,6 +97,14 @@ def procesar_linea(linea, num_linea, requerir_peticion=True):
         print(f"    [OK] Regla Sintáctica: {resultado['regla']} (ID: {resultado.get('regla_id', 'N/A')})")
     if resultado.get("resultado"):
         print(f"    SQL Generado: {resultado['resultado']}")
+    if resultado.get("datos"):
+        datos = resultado["datos"]
+        if datos.get("exito") and datos.get("filas"):
+            print(f"    [PostgreSQL] {datos.get('total', 0)} registros obtenidos:")
+            for fila in datos["filas"]:
+                print(f"       * {fila}")
+        elif datos.get("error"):
+            print(f"    [Aviso DB]: {datos['error']}")
     return True
 
 

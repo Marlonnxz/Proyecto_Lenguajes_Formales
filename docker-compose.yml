@@ -1,9 +1,41 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: esql-postgres
+    environment:
+      POSTGRES_USER: esql_user
+      POSTGRES_PASSWORD: esql_pass
+      POSTGRES_DB: esql_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U esql_user -d esql_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   esql:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: esql-language
+    environment:
+      DATABASE_URL: postgresql://esql_user:esql_pass@db:5432/esql_db
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: esql_db
+      DB_USER: esql_user
+      DB_PASSWORD: esql_pass
     ports:
       - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  postgres_data:
