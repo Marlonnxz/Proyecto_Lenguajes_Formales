@@ -19,10 +19,18 @@
   }
   header {
     padding: 10px 16px; border-bottom: 1px solid var(--borde); background: var(--panel);
-    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   }
+  .header-left { display: flex; align-items: baseline; gap: 12px; }
   header b { color: var(--verde); letter-spacing: .5px; }
   header span { color: var(--tenue); font-size: 12px; }
+  .badge {
+    padding: 2px 8px; border-radius: 4px; font-size: 11px;
+    letter-spacing: .3px; font-weight: 500;
+  }
+  .badge-ok { color: var(--verde); border: 1px solid rgba(126, 231, 135, 0.4); background: rgba(126, 231, 135, 0.08); }
+  .badge-warn { color: var(--amarillo); border: 1px solid rgba(210, 153, 34, 0.4); background: rgba(210, 153, 34, 0.08); }
+  
   #salida { flex: 1; overflow-y: auto; padding: 16px; white-space: pre-wrap; word-break: break-word; }
   #salida > div { margin-bottom: 4px; }
   .eco { color: var(--tenue); }
@@ -32,11 +40,45 @@
   .sql { color: var(--azul); }
   .info { color: var(--tenue); }
   .etiqueta { color: var(--violeta); }
+  
   table { border-collapse: collapse; margin: 6px 0 10px; font-size: 13px; }
-  th, td { border: 1px solid var(--borde); padding: 2px 10px; text-align: left; }
+  th, td { border: 1px solid var(--borde); padding: 4px 10px; text-align: left; }
   th { color: var(--tenue); font-weight: normal; background: var(--panel); }
   td.tipo { color: var(--amarillo); }
   td.valor { color: var(--azul); }
+
+  .tabla-datos-container {
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 6px 0 12px;
+  }
+  table.tabla-datos {
+    border-collapse: collapse;
+    margin: 0;
+    font-size: 13px;
+    min-width: 320px;
+  }
+  table.tabla-datos th {
+    background: #21262d;
+    color: var(--verde);
+    font-weight: 600;
+    padding: 5px 12px;
+    border: 1px solid var(--borde);
+    white-space: nowrap;
+  }
+  table.tabla-datos td {
+    border: 1px solid var(--borde);
+    padding: 5px 12px;
+    color: var(--texto);
+    white-space: nowrap;
+  }
+  table.tabla-datos tr:nth-child(even) td {
+    background: rgba(255, 255, 255, 0.02);
+  }
+  table.tabla-datos tr:hover td {
+    background: rgba(121, 192, 255, 0.07);
+  }
+
   form { display: flex; align-items: center; gap: 8px; padding: 10px 16px;
          border-top: 1px solid var(--borde); background: var(--panel); }
   form b { color: var(--verde); }
@@ -48,8 +90,11 @@
 </head>
 <body>
 <header>
-  <b>ESQL</b>
-  <span>consola interactiva &mdash; escribe <code>ayuda</code> para ver los comandos</span>
+  <div class="header-left">
+    <b>ESQL</b>
+    <span>consola interactiva &mdash; escribe <code>ayuda</code> para ver los comandos</span>
+  </div>
+  <div id="db-badge" class="badge badge-warn">DB: Conectando...</div>
 </header>
 
 <div id="salida"></div>
@@ -62,6 +107,7 @@
 <script>
 const salida = document.getElementById('salida');
 const entrada = document.getElementById('entrada');
+const dbBadge = document.getElementById('db-badge');
 const historial = [];
 let cursor = 0;
 
@@ -82,28 +128,70 @@ function tablaTokens(tokens) {
   escribir(`<table><tr><th>#</th><th>tipo</th><th>valor</th></tr>${filas}</table>`);
 }
 
+function tablaDatos(datos) {
+  if (!datos.filas || datos.filas.length === 0) {
+    escribir('<span class="info">&rarr; Consulta ejecutada: 0 registros encontrados.</span>');
+    return;
+  }
+  const ths = datos.columnas.map(c => `<th>${escapar(c)}</th>`).join('');
+  const trs = datos.filas.map(fila => {
+    const tds = datos.columnas.map(col => {
+      const val = fila[col];
+      const txt = (val === null || val === undefined) ? '&mdash;' : escapar(val);
+      return `<td>${txt}</td>`;
+    }).join('');
+    return `<tr>${tds}</tr>`;
+  }).join('');
+
+  escribir(`<div class="tabla-datos-container"><table class="tabla-datos"><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table></div>`);
+}
+
+async function actualizarEstadoDB() {
+  try {
+    const st = await fetch('/db/estado').then(x => x.json());
+    if (st.conectado) {
+      dbBadge.textContent = `● PostgreSQL: Conectado (${st.servidor})`;
+      dbBadge.className = 'badge badge-ok';
+    } else {
+      dbBadge.textContent = `○ PostgreSQL: Desconectado`;
+      dbBadge.className = 'badge badge-warn';
+    }
+    return st;
+  } catch (e) {
+    dbBadge.textContent = `○ DB Error de Red`;
+    dbBadge.className = 'badge badge-warn';
+    return { conectado: false, error: e.message };
+  }
+}
+
 const AYUDA = `Modos de salida (palabra clave opcional al inicio de la sentencia):
   <span class="etiqueta">tokens:</span> &lt;consulta&gt;   solo el listado de tokens
   <span class="etiqueta">sql:</span> &lt;consulta&gt;      solo el SQL generado
   <span class="etiqueta">regla:</span> &lt;consulta&gt;    solo la regla sintáctica aplicada
-  sin prefijo            respuesta completa (tokens + regla + SQL)
+  <span class="etiqueta">datos:</span> &lt;consulta&gt;    solo los registros devueltos de la BD
+  sin prefijo            respuesta completa (tokens + regla + SQL + datos reales)
 
 La consulta acepta el formato <span class="etiqueta">peticion = &lt;consulta&gt;</span> o directa.
 
 Comandos de la consola:
   <span class="etiqueta">ayuda</span>     esta guía
   <span class="etiqueta">reglas</span>    gramática soportada por el compilador
-  <span class="etiqueta">ejemplos</span>  sentencias de muestra
+  <span class="etiqueta">db</span>        verificar estado de conexión con PostgreSQL
+  <span class="etiqueta">ejemplos</span>  sentencias de muestra listas para probar
   <span class="etiqueta">limpiar</span>   limpiar pantalla
 
-Ejemplo:  <span class="sql">tokens: consulta nombre y correo de la tabla clientes</span>`;
+Ejemplo:  <span class="sql">consulta nombre y correo de la tabla clientes</span>`;
 
 const EJEMPLOS = [
-  'selecciona nombre, edad de la tabla usuarios',
-  'consulta nombre y correo de la tabla clientes',
-  'sql: muestra salario de la tabla empleados donde edad > 18',
-  'tokens: lista id de la tabla pedidos ordenar por fecha',
-  'regla: peticion = obten nombre de la tabla productos',
+  'selecciona todos los datos de la tabla usuarios',
+  'selecciona * de la tabla productos',
+  'selecciona id, nombre, correo, telefono, ciudad de la tabla clientes',
+  'selecciona nombre, edad de la tabla usuarios donde edad > 18',
+  'consulta nombre, telefono de la tabla clientes donde ciudad = \'Bogota\'',
+  'muestra salario, edad de la tabla empleados donde edad > 25 y salario < 6000',
+  'selecciona nombre, edad de la tabla usuarios donde edad entre 20 y 30',
+  'lista id, fecha, total de la tabla pedidos ordenar por total descendente',
+  'selecciona puesto de la tabla empleados agrupar por puesto',
 ];
 
 async function reglas() {
@@ -135,7 +223,15 @@ async function ejecutar(codigo) {
     escribir(`[OK] Regla ${r.regla_id ?? ''}: ${escapar(r.regla)}`, 'ok');
   }
   if (r.resultado) {
-    escribir(`SQL: <span class="sql">${escapar(r.resultado)}</span>`);
+    escribir(`SQL Generado: <span class="sql">${escapar(r.resultado)}</span>`);
+  }
+  if (r.datos) {
+    if (r.datos.exito) {
+      escribir(`Resultados en PostgreSQL (${r.datos.total} fila${r.datos.total === 1 ? '' : 's'}):`, 'ok');
+      tablaDatos(r.datos);
+    } else if (r.datos.error) {
+      escribir(`[Aviso Base de Datos]: ${escapar(r.datos.error)}`, 'error');
+    }
   }
 }
 
@@ -153,6 +249,14 @@ document.getElementById('prompt').addEventListener('submit', async (e) => {
   if (cmd === 'limpiar' || cmd === 'clear' || cmd === 'cls') return (salida.innerHTML = '');
   if (cmd === 'ayuda' || cmd === 'help' || cmd === '?') return escribir(AYUDA, 'info');
   if (cmd === 'reglas') return reglas();
+  if (cmd === 'db' || cmd === 'estado') {
+    const st = await actualizarEstadoDB();
+    if (st.conectado) {
+      return escribir(`[PostgreSQL OK] Conectado exitosamente en: ${escapar(st.servidor)}`, 'ok');
+    } else {
+      return escribir(`[PostgreSQL Desconectado] ${escapar(st.error || 'No disponible')}`, 'error');
+    }
+  }
   if (cmd === 'ejemplos') {
     escribir('Sentencias de ejemplo:', 'info');
     return EJEMPLOS.forEach((x) => escribir(`  <span class="sql">${escapar(x)}</span>`));
@@ -172,7 +276,8 @@ document.addEventListener('click', () => {
 });
 
 escribir('Compilador de Lenguaje Natural a SQL (ESQL) &mdash; v1.0', 'ok');
-escribir('Escribe <span class="etiqueta">ayuda</span> para ver comandos y modos de salida.\n', 'info');
+escribir('Escribe <span class="etiqueta">ayuda</span> para comandos o <span class="etiqueta">ejemplos</span> para consultas de prueba.\n', 'info');
+actualizarEstadoDB();
 </script>
 </body>
 </html>

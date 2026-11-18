@@ -36,12 +36,30 @@ def consola():
 @app.get("/info")
 def info():
     """Información del lenguaje, versión y modos de salida disponibles."""
+    db_estado = {"conectado": False}
+    try:
+        from db import verificar_estado
+        db_estado = verificar_estado()
+    except Exception:
+        pass
+
     return {
         "lenguaje": "ESQL",
         "version": "v1.0",
         "estado": "En desarrollo",
         "modos": list(MODOS),
+        "db": db_estado,
     }
+
+
+@app.get("/db/estado")
+def estado_db():
+    """Estado de conexión a la base de datos PostgreSQL."""
+    try:
+        from db import verificar_estado
+        return verificar_estado()
+    except Exception as e:
+        return {"conectado": False, "error": str(e)}
 
 
 @app.get("/reglas")

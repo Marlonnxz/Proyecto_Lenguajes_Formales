@@ -67,7 +67,7 @@
           "q4": { "WHERE_CLAUSE": "q5" },
           "q5": { "ID": "q6" },
           "q6": { "OPERADOR": "q7" },
-          "q7": { "ID": "q8" }
+          "q7": { "ID": "q8", "STRING": "q8" }
         },
         "finales": ["q8"]
       }
@@ -122,7 +122,7 @@
           "q4": { "WHERE_CLAUSE": "q5" },
           "q5": { "ID": "q6" },
           "q6": { "OPERADOR": "q7" },
-          "q7": { "ID": "q8" },
+          "q7": { "ID": "q8", "STRING": "q8" },
           "q8": { "ORDER_CLAUSE": "q9" },
           "q9": { "ID": "q10" }
         },
@@ -152,17 +152,18 @@
     {
       "id": 9,
       "nombre": "Consulta de Todos los Campos",
-      "descripcion": "SELECT + '*' + FROM + ID",
+      "descripcion": "SELECT + WILDCARD + FROM + ID",
       "apuntador": "accion_todos_campos",
       "automata": {
         "inicio": "q0",
         "transiciones": {
           "q0": { "SELECT": "q1" },
-          "q1": { "ID": "q2" },
+          "q1": { "WILDCARD": "q2" },
           "q2": { "FROM": "q3" },
-          "q3": { "ID": "q4" }
+          "q3": { "ID": "q4" },
+          "q4": { "ID": "q5" }
         },
-        "finales": ["q4"]
+        "finales": ["q4", "q5"]
       }
     },
     {
@@ -181,9 +182,174 @@
           "q5": { "WHERE_CLAUSE": "q6" },
           "q6": { "ID": "q7" },
           "q7": { "OPERADOR": "q8" },
-          "q8": { "ID": "q9" }
+          "q8": { "ID": "q9", "STRING": "q9" }
         },
         "finales": ["q9"]
+      }
+    },
+    {
+      "id": 11,
+      "nombre": "Consulta N Campos (Dinámica)",
+      "descripcion": "SELECT + ID + (SEPARATOR + ID)* + FROM + ID",
+      "apuntador": "accion_n_campos",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2" },
+          "q2": { "SEPARATOR": "q3", "FROM": "q4" },
+          "q3": { "ID": "q2" },
+          "q4": { "ID": "q5" },
+          "q5": { "ID": "q6" }
+        },
+        "finales": ["q5", "q6"]
+      }
+    },
+    {
+      "id": 12,
+      "nombre": "Consulta N Campos con Filtro WHERE",
+      "descripcion": "SELECT + (Campos o WILDCARD) + FROM + Tabla + WHERE + Condición",
+      "apuntador": "accion_filtro_where_n_campos",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2", "WILDCARD": "q4" },
+          "q2": { "SEPARATOR": "q3", "FROM": "q5" },
+          "q3": { "ID": "q2" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "ID": "q7", "WHERE_CLAUSE": "q8" },
+          "q7": { "WHERE_CLAUSE": "q8" },
+          "q8": { "ID": "q9" },
+          "q9": { "OPERADOR": "q10" },
+          "q10": { "ID": "q11", "STRING": "q11" }
+        },
+        "finales": ["q11"]
+      }
+    },
+    {
+      "id": 13,
+      "nombre": "Consulta con Ordenamiento y Dirección",
+      "descripcion": "SELECT + (Campos o WILDCARD) + FROM + Tabla + ORDER + ID (+ ORDER_DIR)",
+      "apuntador": "accion_ordenamiento_direccion",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2", "WILDCARD": "q4" },
+          "q2": { "SEPARATOR": "q3", "FROM": "q5" },
+          "q3": { "ID": "q2" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "ID": "q7", "ORDER_CLAUSE": "q8" },
+          "q7": { "ORDER_CLAUSE": "q8" },
+          "q8": { "ID": "q9" },
+          "q9": { "ORDER_DIR": "q10" }
+        },
+        "finales": ["q9", "q10"]
+      }
+    },
+    {
+      "id": 14,
+      "nombre": "Consulta con Filtro Múltiple (AND/OR)",
+      "descripcion": "SELECT + (Campos o WILDCARD) + FROM + Tabla + WHERE + Condición + (LOGICAL_OP + Condición)+",
+      "apuntador": "accion_filtro_multiple",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2", "WILDCARD": "q4" },
+          "q2": { "SEPARATOR": "q3", "FROM": "q5" },
+          "q3": { "ID": "q2" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "ID": "q7", "WHERE_CLAUSE": "q8" },
+          "q7": { "WHERE_CLAUSE": "q8" },
+          "q8": { "ID": "q9" },
+          "q9": { "OPERADOR": "q10" },
+          "q10": { "ID": "q11", "STRING": "q11" },
+          "q11": { "LOGICAL_OP": "q8", "SEPARATOR": "q8" }
+        },
+        "finales": ["q11"]
+      }
+    },
+    {
+      "id": 15,
+      "nombre": "Consulta con Rango BETWEEN",
+      "descripcion": "SELECT + (Campos o WILDCARD) + FROM + Tabla + WHERE + ID + BETWEEN + Val1 + y + Val2",
+      "apuntador": "accion_filtro_between",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2", "WILDCARD": "q4" },
+          "q2": { "SEPARATOR": "q3", "FROM": "q5" },
+          "q3": { "ID": "q2" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "ID": "q7", "WHERE_CLAUSE": "q8" },
+          "q7": { "WHERE_CLAUSE": "q8" },
+          "q8": { "ID": "q9" },
+          "q9": { "BETWEEN_CLAUSE": "q10" },
+          "q10": { "ID": "q11", "STRING": "q11" },
+          "q11": { "SEPARATOR": "q12" },
+          "q12": { "ID": "q13", "STRING": "q13" }
+        },
+        "finales": ["q13"]
+      }
+    },
+    {
+      "id": 16,
+      "nombre": "Consulta con Agrupamiento (GROUP BY)",
+      "descripcion": "SELECT + (Campos o WILDCARD) + FROM + Tabla + GROUP_CLAUSE + ID",
+      "apuntador": "accion_agrupamiento",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2", "WILDCARD": "q4" },
+          "q2": { "SEPARATOR": "q3", "FROM": "q5" },
+          "q3": { "ID": "q2" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "ID": "q7", "GROUP_CLAUSE": "q8" },
+          "q7": { "GROUP_CLAUSE": "q8" },
+          "q8": { "ID": "q9" },
+          "q9": { "SEPARATOR": "q8" }
+        },
+        "finales": ["q9"]
+      }
+    },
+    {
+      "id": 17,
+      "nombre": "Consulta Maestra Avanzada (Filtro + Agrupamiento / Orden)",
+      "descripcion": "SELECT + (Campos o WILDCARD) + FROM + Tabla + WHERE? + GROUP BY? + ORDER BY?",
+      "apuntador": "accion_maestra_avanzada",
+      "automata": {
+        "inicio": "q0",
+        "transiciones": {
+          "q0": { "SELECT": "q1" },
+          "q1": { "ID": "q2", "WILDCARD": "q4" },
+          "q2": { "SEPARATOR": "q3", "FROM": "q5" },
+          "q3": { "ID": "q2" },
+          "q4": { "FROM": "q5" },
+          "q5": { "ID": "q6" },
+          "q6": { "ID": "q7", "WHERE_CLAUSE": "q8", "GROUP_CLAUSE": "q12", "ORDER_CLAUSE": "q14" },
+          "q7": { "WHERE_CLAUSE": "q8", "GROUP_CLAUSE": "q12", "ORDER_CLAUSE": "q14" },
+          "q8": { "ID": "q9" },
+          "q9": { "OPERADOR": "q10", "BETWEEN_CLAUSE": "qb1" },
+          "q10": { "ID": "q11", "STRING": "q11" },
+          "qb1": { "ID": "qb2", "STRING": "qb2" },
+          "qb2": { "SEPARATOR": "qb3" },
+          "qb3": { "ID": "q11", "STRING": "q11" },
+          "q11": { "LOGICAL_OP": "q8", "SEPARATOR": "q8", "GROUP_CLAUSE": "q12", "ORDER_CLAUSE": "q14" },
+          "q12": { "ID": "q13" },
+          "q13": { "SEPARATOR": "q12", "ORDER_CLAUSE": "q14" },
+          "q14": { "ID": "q15" },
+          "q15": { "ORDER_DIR": "q16" }
+        },
+        "finales": ["q11", "q13", "q15", "q16"]
       }
     }
   ]
